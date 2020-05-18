@@ -1,0 +1,145 @@
+# Convolutional Neural Network
+
+# Installing Theano
+# pip install --upgrade --no-deps git+git://github.com/Theano/Theano.git
+
+# Installing Tensorflow
+# pip install tensorflow
+
+# Installing Keras
+# pip install --upgrade keras
+
+# Part 1 - Building the CNN
+
+# Importing the Keras libraries and packages
+from keras.models import Sequential
+from keras.layers import Conv2D
+from keras.layers import MaxPooling2D
+from keras.layers import Flatten
+from keras.layers import Dense
+from IPython.display import display
+from PIL import Image
+
+
+# Initialising the CNN
+classifier = Sequential()
+
+# Step 1 - Convolution
+# Syntax: Conv2D(Number_of_filters, filter_size, size_of_input_RGB_image, activation_fxn)
+
+# When using this layer as the `first layer` in a model,provide the keyword argument `input_shape`
+# e.g. `input_shape=(128, 128, 3)` for 128x128 RGB pictures
+
+classifier.add(Conv2D(32, (3, 3), input_shape = (64, 64, 3), activation = 'relu'))
+
+
+# Step 2 - Pooling
+classifier.add(MaxPooling2D(pool_size = (2, 2)))
+
+# Adding a second convolutional layer
+# No. of filters are often recommended to take like-32, 64, 128 and filter size must be taken odd with minimum dim 
+# to be (3,3) and then (5,5)
+classifier.add(Conv2D(32, (3, 3), activation = 'relu')) # Here we don't need to add input_shape as we are adding to the same object 'classifier
+
+classifier.add(MaxPooling2D(pool_size = (2, 2)))
+
+
+
+# Step 3 - Flattening 
+# Converting the images into a single array
+classifier.add(Flatten())  # After Flattening we'll have 32 inputs
+
+# Step 4 - Full connection
+# Dense means Hidden layer
+classifier.add(Dense(units = 128, activation = 'relu'))
+
+# The following line of code is for the output layer. As it's a binary so units=1 as per one-hot-encoding but when
+# comes to multi-class classification we put units=n where n is the number of classes our output has.
+classifier.add(Dense(units = 1, activation = 'sigmoid'))
+
+
+# So from above we can say, we have:
+# 32- inputs
+# 128 - Hidden neurons
+# 1 - Output Neuron
+
+# Compiling the CNN
+classifier.compile(optimizer = 'adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
+# for binary classification use: loss = 'binary_crossentropy'
+# for multi-classification use: loss = 'categorical_crossentropy'
+
+
+# Part 2 - Fitting the CNN to the images
+
+from keras.preprocessing.image import ImageDataGenerator
+
+# Image data augmentation is a technique that can be used to artificially expand the size of a training dataset by creating modified versions of images in the dataset. ... The Keras deep learning neural network library provides the capability to fit models using image data augmentation via the ImageDataGenerator class.
+
+# ImageDataGenerator - It replaces the original training data.
+
+# Keras ImageDataGenerator class actually works by:
+
+# * Accepting a batch of images used for training.
+# * Taking this batch and applying a series of random transformations to each image in the batch (including random rotation, resizing, shearing, etc.).
+# * Replacing the original batch with the new, randomly transformed batch.
+# * Training the CNN on this randomly transformed batch (i.e., the original data itself is not used for training).
+
+# NOTE: That’s right — the Keras ImageDataGenerator class is not an “additive” operation. It’s not taking the original data, randomly transforming it, and then returning both the original data and transformed data.Instead, the ImageDataGenerator accepts the original data, randomly transforms it, and returns only the new, transformed data.
+
+train_datagen = ImageDataGenerator(rescale = 1./255,
+                                   shear_range = 0.2,
+                                   zoom_range = 0.2,
+                                   horizontal_flip = True)
+
+# rescale is a value by which we will multiply the data `before any other processing`. Our original images consist in RGB coefficients in the 0-255, but such values would be too high for our models to process (given a typical learning rate), so we target values between 0 and 1 instead by scaling with a 1/255. factor. This is done to convert the image from coloured to black and white.
+
+# zoom_range is for randomly zooming inside pictures
+
+# horizontal_flip is for randomly flipping half of the images horizontally --relevant when there are no assumptions of horizontal assymetry (e.g. real-world pictures).
+
+test_datagen = ImageDataGenerator(rescale = 1./255)
+
+# In flow_from_directory we have to give the path of the parent directory in which sub directories are present
+training_set = train_datagen.flow_from_directory(r"C:\Users\khand\Downloads\\Images_databank\Acquaintance",
+                                                 target_size = (64, 64),
+                                                 batch_size = 32,
+                                                 class_mode = 'binary') 
+# class_mode = 'binary' is for classification into two categories
+# class_mode='categorical' is for the multi-class classification
+
+test_set = test_datagen.flow_from_directory(r"C:\Users\khand\Downloads\\Images_databank\Acquaintance",
+                                            target_size = (64, 64),
+                                            batch_size = 32,
+                                            class_mode = 'binary')
+
+
+classifier.fit_generator(training_set,
+                         steps_per_epoch = 8000,
+                         epochs = 1,
+                         validation_data = test_set,    
+                         validation_steps = 2000)
+
+# Keep in mind that a Keras data generator is meant to loop infinitely — it should never return or exit.
+#Since the function is intended to loop infinitely, Keras has no ability to determine when one epoch starts and a new epoch begins.
+#Therefore, we compute the steps_per_epoch  value as the total number of training data points divided by the batch size. Once Keras hits this step count it knows that it’s a new epoch.
+
+
+
+# Part 3 - Making new predictions
+
+import numpy as np
+from keras.preprocessing import image
+test_image = image.load_img('r"C:\Users\khand\Downloads\\Images_databank\test\cat.11.jpg", target_size = (64, 64))
+test_image = image.img_to_array(test_image)
+test_image = np.expand_dims(test_image, axis = 0)
+result = classifier.predict(test_image)
+
+# To see what index represents which class we use .class_indices
+training_set.class_indices
+
+if result[0][0] == 1:
+    prediction = 'dog'
+    print(prediction)
+else:
+    prediction = 'cat'
+    print(prediction)
